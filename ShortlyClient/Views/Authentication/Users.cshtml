@@ -1,26 +1,34 @@
-﻿
-@{
+﻿@{
     ViewData["Title"] = "All users";
 }
 
 <div class="container">
     <div class="row row-cols-1 row-cols-md-1 g-4">
-@* 
-        @foreach (var user in Model) *@
-        @* { *@
+
+        @foreach (var user in Model) 
+         {
+            // Use non-generic interfaces to avoid InvalidCastException at runtime
+            var urlCount = ((System.Collections.ICollection)user.Urls).Count;
+            var totalClicks = 0;
+            foreach (dynamic u in (System.Collections.IEnumerable)user.Urls)
+            {
+                totalClicks += (int)u.NrOfClicks;
+            }
+
+            var collapseId = "collapse_" + user.Id;
 
             <div class="col">
                 <div class="card">
                     <div class="card-body">
-                        @* <h5 class="card-title">@user.FullName</h5> *@
-@*                         <p class="card-text">This user has created @user.Urls.Count link(s) and has a total of @user.Urls.Sum(n => n.NrOfClicks) click(s).</p>
- *@
+                         <h5 class="card-title">@user.FullName</h5> 
+                         <p class="card-text">This user has created @urlCount link(s) and has a total of @totalClicks click(s).</p>
+
                         <p class="d-inline-flex gap-1">
-                            <a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseExample1" role="button" aria-expanded="false" aria-controls="collapseExample1">
+                            <a class="btn btn-primary" data-bs-toggle="collapse" href="#@collapseId" role="button" aria-expanded="false" aria-controls="@collapseId">
                                 Show details
                             </a>
                         </p>
-                        <div class="collapse" id="collapseExample1">
+                        <div class="collapse" id="@collapseId">
                             <div class="card card-body">
                                 <table class="table table-striped">
                                     <thead>
@@ -31,14 +39,14 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                       @*  @foreach (var userUrl in @user.Urls)
+                                        @foreach (var userUrl in user.Urls)
                                         {
                                             <tr>
                                                 <td>@userUrl.OriginalLink</td>
                                                 <td>@userUrl.ShortLink</td>
                                                 <td>@userUrl.NrOfClicks</td>
                                             </tr>
-                                        } *@
+                                        }
                                     </tbody>
                                 </table>
                             </div>
@@ -46,12 +54,12 @@
 
                     </div>
                     <div class="card-footer">
-                        @* <small class="text-muted">
-                            @user.Urls.Count link(s), @user.Urls.Sum(n => n.NrOfClicks) click(s)
-                        </small> *@
+                        <small class="text-muted">
+                            @urlCount link(s), @totalClicks click(s)
+                        </small>
                     </div>
                 </div>
             </div>
-       @*  } *@
+        }
     </div>
 </div>

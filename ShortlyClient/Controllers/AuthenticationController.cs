@@ -326,7 +326,6 @@ namespace ShortlyClient.Controllers
 
 		public async Task<IActionResult> ExternalLoginCallback(string returnUrl = "", string remoteError = "")
 		{
-
 			var loginVM = new LoginVM()
 			{
 				Schemes = await _signInManager.GetExternalAuthenticationSchemesAsync()
@@ -338,13 +337,19 @@ namespace ShortlyClient.Controllers
 				return View("Login", loginVM);
 			}
 
-			//Get login info
+			// Get login info
 			var info = await _signInManager.GetExternalLoginInfoAsync();
 			if (info == null)
 			{
 				ModelState.AddModelError("", $"Error from extranal login provide: {remoteError}");
 				return View("Login", loginVM);
 			}
+
+			// Log incoming claims for debugging (optional)
+			_logger.LogInformation("External login from {Provider}. ProviderKey={ProviderKey}. Claims={Claims}",
+				info.LoginProvider,
+				info.ProviderKey,
+				string.Join("; ", info.Principal.Claims.Select(c => $"{c.Type}={c.Value}")));
 
 			var signInResult = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: true);
 
@@ -359,22 +364,41 @@ namespace ShortlyClient.Controllers
 
 					if (user == null)
 					{
+
 						user = new AppUser()
 						{
-							UserName = userEmail,
+							UserName = userEmail.Split("@")[0],
 							Email = userEmail,
-							EmailConfirmed = true
+							EmailConfirmed = true,
+							FullName = userEmail.Split("@")[0],
+							LockoutEnabled = true
 						};
 
-						await _userManager.CreateAsync(user);
+						var createResult = await _userManager.CreateAsync(user);
+						if (!createResult.Succeeded)
+						{
+							foreach (var error in createResult.Errors)
+							{
+								ModelState.AddModelError("", error.Description);
+							}
+							loginVM.Schemes = await _signInManager.GetExternalAuthenticationSchemesAsync();
+							return View("Login", loginVM);
+						}
+
 						await _userManager.AddToRoleAsync(user, Role.User);
+
+						// Link external login so future sign-ins don't recreate the user
+						var userLogin = new UserLoginInfo(info.LoginProvider, info.ProviderKey, info.ProviderDisplayName);
+						var addLoginResult = await _userManager.AddLoginAsync(user, userLogin);
+						if (!addLoginResult.Succeeded)
+						{
+							_logger.LogWarning("Failed to add external login for user {Email}. Errors: {Errors}", userEmail, string.Join(", ", addLoginResult.Errors.Select(e => e.Description)));
+						}
 					}
 
 					await _signInManager.SignInAsync(user, isPersistent: false);
-
 					return RedirectToAction("Index", "Home");
 				}
-
 			}
 
 			ModelState.AddModelError("", $"Something went wrong");
